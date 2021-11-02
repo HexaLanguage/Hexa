@@ -1,4 +1,5 @@
 // The Hexa Compiler
+// Copyright (C) 2021 RDPStudio
 // Copyright (C) 2018-2020  Oleg Petrenko
 // Copyright (C) 2018  Bogdan Danylchenko
 //
@@ -16,7 +17,7 @@
 
 module
 	// Compiler version
-	let version = "0.0.1"
+	let version = "1.0.0"
 
 	// Contents of hexa.json
 	declare class Package {
