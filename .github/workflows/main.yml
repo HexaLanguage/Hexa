@@ -78,7 +78,7 @@ jobs:
                  zip.write(file)
              zip.close()
          files = ['.\\dist\\hexa-node.js', '.\\dist\\hexa.cmd', '.\\dist\\node.exe']
-         zip_file = '.\\hexa-${{ github.ref }}.zip'
+         zip_file = '.\\hexa.zip'
          zip_files(files, zip_file)
 
       - name: Upload release
@@ -87,6 +87,6 @@ jobs:
         with:
           file_glob: true
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: hexa-${{ github.ref }}.zip
+          file: hexa.zip
           tag: ${{ github.ref }}
           overwrite: true
