@@ -74,7 +74,7 @@ jobs:
          node bootstrap.js hexa.json
          npm i -g nexe
          nexe hexa-node.js --target windows-x64-14.15.3 --name hexa -o hexa
-         ResourceHacker.exe -addoverwrite "hexa.exe", "hexa.exe", "icon.ico", ICONGROUP, MAINICON, 0
+         .\ResourceHacker.exe -addoverwrite "hexa.exe", "hexa.exe", "icon.ico", ICONGROUP, MAINICON, 0
          mkdir dist
          copy hexa-node.js dist
          copy hexa.exe dist
