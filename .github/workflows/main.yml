@@ -37,7 +37,6 @@ jobs:
         shell: python        
         run: |
          import requests
-         import shutil
          file_url = 'https://nodejs.org/dist/v16.13.0/node-v16.13.0-win-x64.zip'
          res = requests.get(url=file_url)
          with open(r'Store.zip',mode='wb') as f:
@@ -66,3 +65,27 @@ jobs:
         with:
           name: Hexa
           path: './dist/*'
+
+      - name: Package Release
+        shell: python
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+         import zipfile
+         def zip_files( files, zip_name ):
+             zip = zipfile.ZipFile( zip_name, 'w', zipfile.ZIP_DEFLATED )
+             for file in files:
+                 zip.write(file)
+             zip.close()
+         files = ['.\\dist\\hexa-node.js', '.\\dist\\hexa.cmd', '.\\dist\\node.exe']
+         zip_file = '.\\hexa-${{ github.ref }}.zip'
+         zip_files(files, zip_file)
+
+      - name: Upload release
+        uses: svenstaro/upload-release-action@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          file_glob: true
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: hexa-${{ github.ref }}.zip
+          tag: ${{ github.ref }}
+          overwrite: true
