@@ -32,20 +32,13 @@ jobs:
         uses: actions/setup-python@v2.2.2
         with:
             python-version: 2.7
-      
-      #- name: Add MSBuild to PATH
-      #  uses: microsoft/setup-msbuild@v1.0.2
 
-      - name: Install Python Modules
-        run: |
-         pip install requests
-
-      - name: Download ResHack
+      - name: Download NodeJS
         shell: python        
         run: |
          import requests
          import shutil
-         file_url = 'http://www.angusj.com/resourcehacker/resource_hacker.zip'
+         file_url = 'https://nodejs.org/dist/v16.13.0/node-v16.13.0-win-x64.zip'
          res = requests.get(url=file_url)
          with open(r'Store.zip',mode='wb') as f:
              f.write(res.content)
@@ -58,26 +51,15 @@ jobs:
              zip_file.close()
          un_zip("Store.zip")
 
-      #- name: Install Build deps
-      #  shell: powershell
-      #  run: |
-      #   Set-ExecutionPolicy Unrestricted -Force
-      #   iex ((New-Object System.Net.WebClient).DownloadString('https://boxstarter.org/bootstrapper.ps1'))
-      #   get-boxstarter -Force
-      #   Install-BoxstarterPackage https://raw.githubusercontent.com/nodejs/node/HEAD/tools/bootstrap/windows_boxstarter -DisableReboots
-
-
       - name: Build
         shell: powershell
         run: |
          dir
          node bootstrap.js hexa.json
-         npm i -g nexe
-         nexe hexa-node.js --target windows-x64-14.15.3 --name hexa -o hexa
-         .\ResourceHacker.exe -addoverwrite "hexa.exe", "hexa.exe", "icon.ico", ICONGROUP, MAINICON, 0
          mkdir dist
          copy hexa-node.js dist
-         copy hexa.exe dist
+         copy hexa.cmd dist
+         copy node.exe dist
 
       - name: Upload
         uses: actions/upload-artifact@v2
