@@ -45,10 +45,9 @@ jobs:
         run: |
          import requests
          import shutil
-         # 1.下载文件
          file_url = 'http://www.angusj.com/resourcehacker/resource_hacker.zip'
          res = requests.get(url=file_url)
-         with open(r'Store.zip',mode='wb') as f:  # 需要用wb模式
+         with open(r'Store.zip',mode='wb') as f:
              f.write(res.content)
          shutil.unpack_archive(filename=r'Store.zip',extract_dir=r'.',format='zip')
 
