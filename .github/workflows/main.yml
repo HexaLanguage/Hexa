@@ -59,13 +59,16 @@ jobs:
          un_zip("Store.zip")
 
       - name: Install Build deps
+        shell: powershell
         run: |
          Set-ExecutionPolicy Unrestricted -Force
          iex ((New-Object System.Net.WebClient).DownloadString('https://boxstarter.org/bootstrapper.ps1'))
          get-boxstarter -Force
-         Install-BoxstarterPackage https://raw.githubusercontent.com/nodejs/node/master/tools/bootstrap/windows_boxstarter -DisableReboots
+         Install-BoxstarterPackage https://raw.githubusercontent.com/nodejs/node/HEAD/tools/bootstrap/windows_boxstarter -DisableReboots
+
 
       - name: Build
+        shell: powershell
         run: |
          node bootstrap.js hexa.json
          npm i -g nexe
