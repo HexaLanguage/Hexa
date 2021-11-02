@@ -54,7 +54,7 @@ jobs:
              """unzip zip file"""  
              zip_file = zipfile.ZipFile(file_name)  
              for names in zip_file.namelist():  
-                 zip_file.extract(names,file_name)
+                 zip_file.extract(names)
              zip_file.close()
          un_zip("Store.zip")
 
