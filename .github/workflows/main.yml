@@ -51,7 +51,7 @@ jobs:
         run: |
          node bootstrap.js hexa.json
          npm i -g nexe
-         nexe-build.bat
+         .\nexe-build.bat
          mkdir dist
          copy hexa-node.js dist
          copy hexa.exe dist
