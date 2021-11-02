@@ -40,23 +40,23 @@ jobs:
         run: |
          pip install requests
 
-      #- name: Download ResHack
-      #  shell: python        
-      #  run: |
-      #   import requests
-      #   import shutil
-      #   file_url = 'http://www.angusj.com/resourcehacker/resource_hacker.zip'
-      #   res = requests.get(url=file_url)
-      #   with open(r'Store.zip',mode='wb') as f:
-      #       f.write(res.content)
-      #   import zipfile  
-      #   def un_zip(file_name):  
-      #       """unzip zip file"""  
-      #       zip_file = zipfile.ZipFile(file_name)  
-      #       for names in zip_file.namelist():  
-      #           zip_file.extract(names)
-      #       zip_file.close()
-      #   un_zip("Store.zip")
+      - name: Download ResHack
+        shell: python        
+        run: |
+         import requests
+         import shutil
+         file_url = 'http://www.angusj.com/resourcehacker/resource_hacker.zip'
+         res = requests.get(url=file_url)
+         with open(r'Store.zip',mode='wb') as f:
+             f.write(res.content)
+         import zipfile  
+         def un_zip(file_name):  
+             """unzip zip file"""  
+             zip_file = zipfile.ZipFile(file_name)  
+             for names in zip_file.namelist():  
+                 zip_file.extract(names)
+             zip_file.close()
+         un_zip("Store.zip")
 
       - name: Install Build deps
         shell: powershell
