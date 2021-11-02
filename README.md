@@ -26,7 +26,7 @@ Hexa is a high level, strictly typed programming language that compiles to JavaS
 
 > **WIP — Work in progress, coming soon**
 
-Release of 0.1 expected in Fall 2020
+Release of 2.0.0 (All WIP completed) expected in Fall 2022
 
 
 ## Build
