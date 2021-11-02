@@ -17,7 +17,7 @@
 
 module
 	// Compiler version
-	let version = "1.0.0"
+	let version = "1.0.2"
 
 	// Contents of hexa.json
 	declare class Package {
