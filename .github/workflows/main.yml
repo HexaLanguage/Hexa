@@ -31,6 +31,10 @@ jobs:
       - name: Setup Python environment
         uses: actions/setup-python@v2.2.2
 
+      - name: Install Python Modules
+        run: |
+         pip install requests
+
       - name: Download ResHack
         shell: python        
         run: |
