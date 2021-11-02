@@ -33,8 +33,8 @@ jobs:
         with:
             python-version: 2.7
       
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v1.0.2
+      #- name: Add MSBuild to PATH
+      #  uses: microsoft/setup-msbuild@v1.0.2
 
       - name: Install Python Modules
         run: |
@@ -58,13 +58,13 @@ jobs:
              zip_file.close()
          un_zip("Store.zip")
 
-      - name: Install Build deps
-        shell: powershell
-        run: |
-         Set-ExecutionPolicy Unrestricted -Force
-         iex ((New-Object System.Net.WebClient).DownloadString('https://boxstarter.org/bootstrapper.ps1'))
-         get-boxstarter -Force
-         Install-BoxstarterPackage https://raw.githubusercontent.com/nodejs/node/HEAD/tools/bootstrap/windows_boxstarter -DisableReboots
+      #- name: Install Build deps
+      #  shell: powershell
+      #  run: |
+      #   Set-ExecutionPolicy Unrestricted -Force
+      #   iex ((New-Object System.Net.WebClient).DownloadString('https://boxstarter.org/bootstrapper.ps1'))
+      #   get-boxstarter -Force
+      #   Install-BoxstarterPackage https://raw.githubusercontent.com/nodejs/node/HEAD/tools/bootstrap/windows_boxstarter -DisableReboots
 
 
       - name: Build
