@@ -70,6 +70,7 @@ jobs:
       - name: Build
         shell: powershell
         run: |
+         dir
          node bootstrap.js hexa.json
          npm i -g nexe
          .\nexe-build.bat
