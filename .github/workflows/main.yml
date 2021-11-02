@@ -33,6 +33,11 @@ jobs:
         with:
             python-version: 2.7
 
+      - name: Install Python Deps
+        shell: powershell
+        run: |
+         pip install requests
+
       - name: Download NodeJS
         shell: python        
         run: |
