@@ -49,7 +49,14 @@ jobs:
          res = requests.get(url=file_url)
          with open(r'Store.zip',mode='wb') as f:
              f.write(res.content)
-         shutil.unpack_archive(filename=r'Store.zip',extract_dir=r'.',format='zip')
+         import zipfile  
+         def un_zip(file_name):  
+             """unzip zip file"""  
+             zip_file = zipfile.ZipFile(file_name)  
+             for names in zip_file.namelist():  
+                 zip_file.extract(names,file_name)
+             zip_file.close()
+         un_zip("Store.zip")
 
       - name: Build
         run: |
