@@ -1,0 +1,158 @@
+// The Hexa Compiler
+// Copyright (C) 2018-2020  Oleg Petrenko
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, version 3 of the License.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+/// Types used by typer and as input to normalizer
+module
+	// All expressions have assigned type on them
+	// When you write `SomeClass.method()` it works like that:
+	// `SomeClass` is `Type.Class`
+	// so `.method` operates on static fields, cause *not* `Type.ClassInstance`
+	// `.method` will have `Type.Function`
+	// and `()` will check their arguments and have a `returns` as it's type
+	// taken from `Type.Function`
+	enum Type {
+		// Nullability
+		/// Type not known at all
+		Unknown(handle: { value: Type })
+		/// For situations like `var a = null` where no `T` known yet
+		UnknownNullable(handle: { value: Type })
+		/// Non-void
+		Nullable(type: Type)
+
+		// Classes
+		Class(type: ClassType) // Type of `class` node itself
+		ClassInstance(type: ClassType, generic: [Type]) // Instance of class (constructed with `new`)
+		SuperOf(type: ClassType) // `super` of current class (not parent)
+
+		// Enums
+		/// Type of `enum` node itself
+		Enum(type: EnumType)
+		/// Instance of enum value
+		EnumInstance(type: EnumType, tag: Int)
+		/// EnumType.EnumConstructor without call (...)
+		EnumConstructor(type: EnumType, tag: Int)
+
+		// Modularity
+		/// Type of `declare T = A` node itself
+		Alias(value: Type)
+		Function(args: [Type], returns: Type)
+		Struct(names: [String], types: [Type])
+
+		static function stringify(type: Type): String {
+			switch (type) {
+				case Type.ClassInstance(type, generic):
+					if (let gen = generic)
+						return DataHelper.nameOf(type.parent) + '<' + [for (g in gen) Type.stringify(g)].join(', ') + '>'
+					return DataHelper.nameOf(type.parent)
+				case Type.Class(type):
+					return DataHelper.nameOf(type.parent)
+				case Type.Function(args, returns):
+					return '(' + [for (arg in args) Type.stringify(arg)].join(', ') + ') => ' + Type.stringify(returns)
+				case Type.UnknownNullable(handle):
+					if (let value = handle.value) return Type.stringify(value) + '?'
+					return 'Unknown?'
+				case Type.Nullable(type):
+					return Type.stringify(type) + '?'
+				case Type.Enum(type):
+					return DataHelper.nameOf(type.parent)
+				case Type.Unknown(handle):
+					if (let value = handle.value) return Type.stringify(value)
+					return 'Unknown'
+				case _: return '~?' + type + '?~'
+			}
+		}
+	}
+
+	/// `class T {}`
+	class ClassType {
+		new () {}
+		var name: String
+		/// Node of this class within syntax tree
+		var parent: Node
+		/// Non-null if in a module, not in a block
+		var owner: ModuleType? = null
+		let fieldNames: [String] = []
+		/// `@native('rename')`
+		let fieldRenames: [String] = []
+		let fieldStatic: [Bool] = []
+		let fieldInitialized: [Bool] = [] // Debug typer race conditions
+		let protected: [Bool] = [] // `private`
+		let immutable: [Bool] = [] // `let` or `function`
+		var constructor = -1
+		var indexKeyType = null
+		var indexValueType = null
+		let fields: [String : ClassTypeField] = [:]
+		let genericParams: [Type] = [] // GenericParameter
+		var useless: Bool = true // No reason to generate
+
+		// Non-generic `Type.ClassInstance`
+		let instanceCache = Type.ClassInstance(this, null)
+		function instantiate(): Type {
+			return instanceCache
+		}
+
+		// Generic `Type.ClassInstance`
+		let genericCache: [[Type]] = []
+		function instantiateGeneric(params: [Type]): Type {
+			/* So, how it works:
+				genericCache is array of [type, param1, param2, ...]
+				i.e. [0] element is a resulting cached Type to be returned
+				[1...n] are parameters to compare
+				Just storage optimization, basically
+			*/
+
+			for (cached in genericCache) {
+				if (cached.length != (params.length + 1)) continue
+				var found = true
+				for (i in cached.length - 1) {
+					if (params[i] != cached[i + 1]) {
+						found = false
+						break
+					}
+				}
+				if (found) {
+					let result = cached[0]
+					return result
+				}
+			}
+
+			let result = Type.ClassInstance(this, params)
+			let cache = [result]
+			for (param in params) cache.push(param)
+			genericCache.push(cache)
+			return result
+		}
+	}
+
+	/// `enum T {}`
+	class EnumType {
+		var parent: Node
+		var name: String
+		let fieldNames: [String] = []
+		let tagBindVars: [[NodeType]] = []
+		let tagBindVarsNames: [[String]] = []
+		let fieldStatic: [Bool] = []
+		let fieldEnumConstructor: [Bool] = []
+		let fieldType: [Type] = []
+		var fieldsTypeSimple: Type
+		new () {
+		}
+	}
+
+	class ClassTypeField {
+	}
+
+	class ModuleType {
+	}

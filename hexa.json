@@ -1,0 +1,51 @@
+{
+	"name": "The Hexa Compiler",
+	"files": [
+		"source/compiler/normalizer.hexa",
+		"source/compiler/typer.hexa",
+		"source/compiler/lexer.hexa",
+		"source/compiler/parser.hexa",
+		"source/tests/dumper.hexa",
+		"source/tests/testLexer.hexa",
+		"source/tests/testParser.hexa",
+		"source/tests/testTyper.hexa",
+		"source/targets/genJs.hexa",
+		"source/targets/genCxx.hexa",
+		"source/targets/genHaxe.hexa",
+		"source/data/token.hexa",
+		"source/data/nice.hexa",
+		"source/data/data.hexa",
+		"source/data/types.hexa",
+		"source/data/compilerError.hexa",
+		"source/data/hints.hexa",
+		"source/targets.hexa",
+		"source/main.hexa"
+	],
+	"define":
+	{
+		"times": false,
+		"debug": false
+	},
+	"output": "hexa-node.js",
+	"license": "LGPL-3.0-only",
+	"author": "RDPStudio",
+	"addLicenseNoticeToOutput": true,
+	"randomSeed": 1,
+	"targets": [
+		{
+			"name": "default",
+			"generator": "js",
+			"options": ["nodejs"],
+			"output": "hexa-node.js"
+		}
+	],
+	"target":
+	{
+		"include": [],
+		"instance":
+		{
+			"generatePackageJson": true
+		},
+		"generator": "JavaScript"
+	}
+}

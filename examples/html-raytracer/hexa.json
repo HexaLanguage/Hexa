@@ -1,0 +1,19 @@
+{
+	"name": "html-raytracer",
+	"version": "1.0.0",
+	"description": "raytracer",
+	"author": "PeyTy",
+	"license": "MIT",
+	"randomSeed": 1,
+	"targets": [
+		{
+			"name": "default",
+			"generator": "js",
+			"options": ["browser"],
+			"output": "raytracer.js"
+		}
+	],
+	"files": [
+		"raytracer.hexa"
+	]
+}

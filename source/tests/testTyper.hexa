@@ -1,0 +1,457 @@
+// The Hexa Compiler
+// Copyright (C) 2018  Oleg Petrenko
+// Copyright (C) 2018  Bogdan Danylchenko
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, version 3 of the License.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module
+	// See: `/docs/typer.md`
+	class TestTyper {
+		static function test() {
+			console.log("TestTyper begin")
+
+			shouldNotError('let a = 1')
+			shouldError('let a')
+			shouldError('let a = 1 a = 2')
+			shouldNotError('var a = 1 var b = 1')
+			shouldNotError('var a = 1 var b = a')
+			shouldNotError('var a = 1 let b = a')
+			shouldError('var a = var b = 1')
+			shouldError('var a = var b')
+			shouldError('var a = { var b }')
+			shouldError('var a = { 1 2 3 var b }')
+			shouldNotError('var a = { 1 2 var b 3 }')
+			shouldNotError('var a = { }')
+			shouldNotError('var z: {} = {} as! {}')
+			shouldError('let a = var b')
+			shouldNotError('var a = 1 a = 2')
+			shouldNotError('let a = { 2 }')
+			shouldNotError('let a = { 1 2 3 2 }')
+			shouldError('let a = return 2')
+			shouldError('let a = { return 2 }')
+			shouldError('let a = { break }')
+			shouldError('let a = break')
+			shouldError('var a = 1, b = return 2')
+
+			// Unop
+			shouldError('!1')
+			shouldNotError('!true')
+			shouldNotError('!!!true')
+			shouldNotError('let a = true !a')
+			shouldNotError('let a: Any = true !a')
+
+			// Binop
+			shouldNotError('"s" + 1')
+			shouldError('("s" + 1).x')
+			shouldNotError('{("s" + 1).length}')
+			shouldNotError('("s" + 1).length')
+			shouldNotError('[("s" + 1).length]')
+
+			shouldError('enum E { A B A }') // Duplicate
+			shouldError('enum E { A(value: Int) B A(value: Int) }') // Duplicate
+			shouldError('enum E { B(value: Int) A = 1 }') // Mixing complex and simple enum values
+			shouldError('enum E { lowercase }') // Values should be upper case
+			shouldNotError('class A { static function x() {} } A.x()')
+			shouldError('class A { static function x() {} static function x() {} }') // Duplicate
+			shouldError('class A { static function x() {} static var x = 1 }') // Duplicate
+			shouldError('class A { static function x() {} var x = 1 }') // Duplicate
+			shouldError('class A { static let x = 1 static var x = 1 }') // Duplicate
+			shouldError('class A { static let x = 1 function x() {} }') // Duplicate
+			shouldNotError('module { class A { static function x() {} } } A.x()')
+			shouldError('class A { static function x() {} } B.y()')
+			shouldError('class A { static function x() {} } A.y()')
+			shouldError('module { class A { static function x() {} } } A.y()')
+
+			// Enum static
+			shouldNotError('enum E : Int { static function x() {} } E.x()')
+			shouldError('enum E : Int { static function x() {} } E.y()')
+			shouldNotError('enum E { A } let a = E.A')
+			shouldError('enum E { A } let a = E.B')
+
+			shouldNotError('class A { static var x = 0 } A.x = 1')
+			shouldError('class A { static var x = 0 } A.y = 1')
+
+			shouldNotError('var x = 1 x = 2')
+			shouldNotError('var x: Bool = true')
+			shouldError('var x: Bool = 1')
+			shouldNotError('var x: Bool? = null')
+			shouldError('var x: Bool = null')
+			shouldNotError('var x: Int = 1 x = 1')
+			shouldError('var x: Int = 1 x = true')
+			shouldError('var x = 1 x = true')
+			shouldError('var x = (1) x = (true)')
+			shouldNotError('var x = 1 var y = 2 x = y')
+			shouldError('var x: Int = 1 var y: Bool = true x = y')
+			shouldError('var x = 1 var y = true x = y')
+			shouldNotError('var x = null x = null')
+			shouldNotError('var x = null x = true')
+			shouldError('var x = 1 x = null')
+			shouldError('var x = 1 var y = x y = true') // Simple inference
+			shouldNotError('var x = null var y = true x = y')
+			shouldError('var x = null var y = true y = x')
+			shouldNotError('function x() {} var y = x y = x')
+			shouldNotError('function x() {} var y: ()=>Void = x y = x')
+
+			shouldNotError('class A { new() {} } let a = new A()')
+			shouldError('class A { } let a = new A()') // No constructor
+			shouldNotError('class A { new() {} var x = 0 } let a = new A() a.x = 1')
+
+			shouldNotError('let a = { b: true } let c = a.b')
+			shouldNotError('let a: { b: Bool } = { b: true } let c = a.b')
+			shouldNotError('let a = { b: true } a.b = false')
+			shouldNotError('let a: { b: Bool } = { b: true } let c: { b: Bool } = a')
+			shouldNotError('let a = { b: true } let c: { b: Bool } = a')
+
+			shouldError('let a = { b: true } let c = a.x') // No field
+			shouldError('let a = { b: true } let c: Int = a.b')
+			shouldError('let a = { b: true } let c = a.b c = 123')
+			shouldError('let a = {a: 1, b: 2, a: 3}') // Duplicate
+
+			// Special cases
+			shouldNotError('var i: Float = 123')
+			shouldError('var i: Int = 0.123')
+
+			// Conditions
+			shouldNotError('if (true) {}')
+			shouldNotError('if (true == false) {}')
+			shouldNotError('if (1 == 2) {}')
+			shouldNotError('if (1 != 2) {}')
+			shouldNotError('if (1 >= 2) {}')
+
+			shouldErrorTemplate(
+				'$d$ a = $a$',
+				['$b$', '{ $b$ }'],
+				['break', 'continue', 'return $c$'],
+				['1', "abc"],
+				['let', '"var"']
+			)
+
+			// Function
+			shouldNotError('var x = function() {return 1} var x = 1')
+			shouldError('let x = function() {return 1} x = 1')
+			shouldError('function x() {return 1} x = 1')
+			shouldError('function x() {return 1} x = function() {return 1}')
+			shouldError('{ function x() {return 1} } x()')
+			shouldError('{ function x() {return return 1} }')
+			shouldError('{ function x(y: Int) { y = 1 } }') // Arguments are immutable
+			shouldError('return 1') // Outside of function
+			shouldError('{ return }') // Outside of function
+			shouldNotError('{ () => { return 1 } }')
+			shouldNotError('{ () => { 1 } }')
+			shouldNotError('{ () => 1 }')
+			shouldNotError('var x = function () {} x = function () {}')
+			shouldError('let x = function () {} x = function () {} ')
+
+			// Check if ever returns
+			shouldNotError('function () {}')
+			shouldNotError('function (): Void {}')
+			shouldNotError('function (): Int { return 0 }')
+			shouldError('function (): Int {}')
+
+			// if-let binding
+			shouldError('var a: Int? = null if (var b = a) {}') // let-only binding
+			shouldError('var a: Int? = null if (let b) {}') // no value
+			shouldError('var a: Int? = null if (let b = a) {} a = b') // no scope leak
+			shouldError('var a: Int? = null if (let b = a) { b = a }') // immutable
+			shouldNotError('var a: Int? = null if (let b = a) {} a = 5')
+			shouldNotError('var a: Int? = null if (let b = a) { a = b }') // type inference
+			shouldNotError('var a: Int? = null if (let a = a) {} a = 5')
+			shouldNotError('var a: Int? = null if (let a = a, let b = a, let a = b) {} a = 5')
+
+			// Function arguments and returns
+			shouldError('function x(y: Int): Void {} var z: Int = x(1)')
+			shouldError('function x(y: Int) {} var z: Int = x(1)')
+			shouldError('function x(y: Int) {} x(x(1))')
+			shouldNotError('function x(y: Int) return 1 var z: Int = x(1)')
+			shouldNotError('function x(y: Int): Int return 1 var z: Int = x(1)')
+			shouldError('function x(): Int { return }')
+			shouldError('function x() { {return} {return 1} }')
+			shouldError('function x(y: Int): Bool return 1 var z: Int = x(1)')
+			shouldError('function x(y: Int) return 1 var z: Bool = x(1)')
+			shouldNotError('function x(y: Int): Void {} x(1)')
+			shouldNotError('function x(y: Int, z: Int): Void {} x(1, 1)')
+			shouldError('function x(y: Int, z: Int): Void {} x(1, true)')
+			shouldError('function x(y: Int): Void {} x(true)')
+			shouldError('function x(y: Void): Void {}')
+			shouldError('function x(y: Int) { { return 1 } return true }')
+			shouldNotError('function x(y: Int) { { return 1 } return 1 }')
+			shouldNotError('enum E { V } function x() { return E.V }')
+			shouldError('function x() { return Int }')
+
+			// Arrays
+			shouldNotError('let a = [2, 4, 1, 2, 5]')
+			shouldNotError('let a = [null, 2, 4, 1, 2]')
+			shouldNotError('var a = [2, 4, 1, 2, 5] a = [2, 3, 4]')
+			shouldError('let a = [2, 4, 1, 2, 5] a = [2, 3, 4]')
+			shouldNotError('var a = 4, b = 2, c = 4 let arr = [a, b, c]')
+			shouldError('var a = for (b in [1, 2, 3, 4]) b')
+			shouldError('var a = (for (b in [1, 2, 3, 4]) b)')
+			shouldNotError('var a = [for (b in [1, 2, 3, 4]) b]')
+			shouldError('var a = [for (b in [1, 2, 3, 4]) a]')
+
+			// Maps
+			shouldNotError('var a = [ 1: "a", 2: "b", 3: "c" ]')
+			shouldNotError('var a = [ "a": 1, "b": 2, "c": 3 ]')
+			shouldNotError('var a = [ "a": 1, "b": 2, "c": 3 ] a = ["l": 11]')
+
+			// Objects
+			shouldNotError('var a = { a: "a" } a.a = "b"')
+			shouldNotError('var a = [{ a: 1 }] a[0].a')
+			shouldError('var a = [{ a: 1 }] a[0].b')
+			shouldError('var a = [{ b: [{c : [1]}] }] a[0].b[0].d')
+			shouldNotError('var a = [{ b: [{c : [1]}] }] a[0].b[0].c[0]')
+
+			// Throw-Try-Catch
+			shouldError('var a = try { throw 1 } catch(e: Any) { throw 2 }')
+			shouldError('var a = { try { throw 1 } catch(e: Any) { throw 2 } }')
+			shouldNotError('var a = try { 1 } catch(e: Any) { 2 }')
+			shouldNotError('try { var a = try { 1 } catch(e: Any) { throw 2 } } catch(e: Any) {}')
+			shouldNotError('var a = try { throw 1 } catch(e: Any) { 2 }')
+			shouldNotError('var a = { try { throw 1 } catch(e: Any) { 2 } }')
+			shouldError('try { 1 } catch(e: Any) { throw 2 }')
+			shouldNotError('try { throw 1 } catch(e: Any) { 2 }')
+			shouldError('var a = throw 1')
+			shouldError('var a = { throw 1 }')
+			shouldError('{ throw 1 }') // Unhandled at file level
+			shouldError('throw 1') // Unhandled at file level
+
+			shouldNotError('try {} catch(e: Any) {}')
+			shouldNotError('try {} catch(e: Int) {}')
+			shouldNotError('try {} catch(e: Float) {}')
+			shouldNotError('try {} catch(e: String) {}')
+			shouldError('try {} catch(e: {}) {}')
+			shouldError('try {} catch(e: ()=>Void) {}')
+
+			// Unhandled exceptions in functions
+			shouldNotError('function f() throw 123') // Infers @throws(Int)
+			shouldError('@noThrow(0) function f() {}')
+			shouldNotError('@noThrow function f() {}')
+			shouldError('@noThrow function f() throw 123')
+			shouldError('@noThrow @throws(Int) function f() throw 123')
+			shouldError('@noThrow @throws function f() {}')
+			shouldNotError('@throws function f() throw 123')
+			shouldNotError('let f = @throws function() throw 123')
+			shouldError('let f = @noThrow function() throw 123')
+			shouldError('let f = @noThrow @throws function() throw 123')
+			shouldNotError('@throws(Int) function f() throw 123')
+			shouldNotError('@throws(Int) function f() {}') // Fake exceptions
+			shouldNotError('function f() try { throw 123 } catch(e: Int) {}')
+
+			// Loops
+			shouldError('{ break }') // Outside of loop
+			shouldError('function hi() { continue }') // Outside of loop
+			shouldNotError('while (true) { break }')
+			shouldNotError('while (true) { continue }')
+			shouldError('while ({ break }) { }')
+			shouldNotError('do { continue } while (true)')
+			shouldError('do { } while ({ continue })')
+			shouldNotError('for (a in []) { continue }')
+			shouldError('for (continue in []) { }')
+			shouldError('for (a in continue) { }')
+
+			// Global modules
+			shouldNotError('class A {}')
+			shouldError('module { class A {} class A {} }') // Can not redefine in same namespace
+			shouldError('module { let x = 1 } x = 1') // Constant
+			shouldNotError('module { var x = 1 } var x = 1') // Overlapping of global var x
+			shouldNotError('module { var x = 1 } x = 1') // Global var x
+			shouldError('module { class A {} } module { class A {} }') // Can not redefine in same namespace
+			shouldNotError('class A {new() {} let a: A = new A()}') // `A` sees itself
+			shouldError('function f() {} f(var a)') // Type cannot be inferred
+			shouldError('function f(x) {} f(var a)') // Type cannot be inferred
+			shouldError('function f() {} f(let a = 1)') // Type cannot be inferred
+
+			// Module namespaces
+			shouldError('module hi { function hi() }') // Non-declare should have a body
+			shouldError('module hi { function () {} }') // Module function should have a name
+			shouldError('function hi() { static var x = 1 }')
+			shouldError('function hi() { private var x = 1 }')
+			shouldError('class A {} A = null')
+			shouldError('class A {} A = A')
+			shouldError('class A {new(){}} A = new A()')
+			shouldError('module { class A {} } A = null')
+			shouldError('module { class A {new(){}} } A = new A()')
+
+			// Classes
+			shouldError('class A { static function hi() { this } }')
+			shouldError('function hi() { this }')
+			shouldError('{ this }')
+			shouldNotError('class A { function hi() { this } }')
+			shouldNotError('class A { new() { this } }')
+			shouldNotError('class A { function hi() { return this } }')
+			shouldNotError('class A {
+				var a: [Int]
+				var b: String
+				new(a, b) { this.a = a this.b = b }
+			}')
+			shouldError('static function hi() { }')
+			shouldError('private function hi() { }')
+			shouldError('class A {new () {}} let a = new A() a.b')
+			shouldNotError('class A {new () {}let b = 1} let a = new A() a.b')
+			shouldError('class A {new () {}let b = 1} let a = new A() a.c')
+			shouldError('class A {new () {}let b = 1} let a = new A() a.b[0]')
+			shouldNotError('class A { var v: Int }')
+			shouldNotError('class A { static var v: Int }')
+
+			// Enums
+			shouldNotError('enum A { static var v: Int }')
+			shouldNotError('enum A { A(x: Int) } switch (A.A(0)) { case A.A(x): {} }')
+			shouldError('enum A { A(x: Int) } switch (A.A(0)) { case A.A(x, y): {} }')
+			shouldNotError('enum A {}')
+			shouldNotError('enum A : Int { }')
+			shouldNotError('enum A : String { }')
+			shouldError('enum A : Float { }')
+			shouldError('enum A : String { F = 1 }')
+			shouldError('enum A : Int { F = "1" }')
+			shouldNotError('enum A : String { F = "1" }')
+
+			// Inheritance
+			shouldError('class A { function hi() { super() } }') // Has no inheritance
+			shouldError('function hi() { super() }')
+			shouldError('{ super }') // Super as value
+			shouldError('{ super() }')
+			shouldError('{ super.hello() }')
+			shouldError('
+				class B { function hi() { } }
+				class A extends B { static function hi() { super() } }')
+			shouldError('
+				class B { function hi() { } }
+				class A extends B { function hi() { (super).hi() } }') // Super as value
+			shouldNotError('
+				class B { function hi() { } }
+				class A extends B { function hi() { super() } }')
+			shouldNotError('
+				class B { function hi() { } }
+				class A extends B { function hi() { super.hi() } }')
+
+			// Type existence
+			shouldError('var a: Unknown = 1')
+			shouldError('function a(): Unknown {}')
+			shouldError('class A extends Unknown {}')
+			shouldError('class A implements Unknown {}')
+
+			// Typing inference
+			shouldError('let x = if (true) false else 1')
+			shouldNotError('let x = if (true) 0 else 1')
+			shouldError('var x = if (true) 0 else 1 x = true')
+			shouldNotError('var x = if (true) 0 else 1 x = 2')
+
+			shouldNotError('let x = 0 ?? 1')
+			shouldError('let x = 0 ?? true')
+			shouldNotError('var x = 0 ?? 1 x = 2')
+			shouldError('var x = 0 ?? 1 x = true')
+
+			shouldError('let x = 0 x += 0')
+			shouldNotError('var x = 0 x += 0')
+			shouldError('var x = 0 x += true')
+			shouldNotError('var x = 0 var z = x += 0 z = 0')
+			shouldError('var x = 0 var z = x += 0 z = true')
+
+			// Typing is
+			shouldNotError('let t = 1 t is Int')
+			shouldError('let t = 1 t is Any')
+			shouldError('let t = 1 t is Void')
+
+			// Typing as
+			shouldError('let t = 1 t as Unknown')
+			shouldNotError('let t = 1 t as Int')
+			shouldError('let t = 1 t as Void')
+			shouldNotError('function int(): Int return 1 int() as Int')
+			shouldError('function void(): Void {} void() as Int')
+
+			// Generics
+			shouldNotError("class T<A, B> {}")
+			shouldError("class T<A, A> {}")
+			shouldError("class T<A, B, A> {}")
+
+			// Declarations
+			shouldError("declare var a")
+			shouldError("declare var a = value")
+			shouldError("declare var a: Int = value")
+			shouldNotError("declare var a: Int")
+			shouldError("declare function()")
+			shouldNotError("declare function(): Int")
+			shouldError("var a = declare function(): Int")
+
+			// Attributes
+			shouldNotError('@att("value") 123')
+			shouldNotError('let known = 1 @att(known) 123')
+
+			console.log('TestTyper done \(Math.round((passed/overall)*100))% (\(passed)/\(overall))')
+		}
+
+		static var passed = 0
+		static var overall = 0
+
+		//
+		// Helpers
+		//
+
+		static function shouldNotError(input: String): Void {
+			overall++
+			var errorText = didError(input)
+			if (errorText != null)
+				throw 'TestTyper test fail: `\(input)` should NOT throw error, but it did.\r\n' + errorText
+			passed++
+		}
+
+		static function shouldError(input: String): Void {
+			overall++
+			if (didError(input) == null)
+				throw 'TestTyper test fail: `\(input)` should throw error, but it did not.'
+			passed++
+		}
+
+		static function template(code: String, a: [String], b: [String] = null, c: [String] = null, d: [String] = null): [String] {
+			let tests = []
+			for (ta in a) {
+				let ca = code.split('$a$').join(ta)
+				if (let bs = b) for (tb in bs) {
+					let cb = ca.split('$b$').join(tb)
+					if (let cs = c) for (tc in cs) {
+						let cc = cb.split('$c$').join(tc)
+						if (let ds = d) for (td in ds) {
+							let cd = cc.split('$d$').join(td)
+							if (tests.indexOf(cd) == -1) tests.push(cd)
+						} else if (tests.indexOf(cc) == -1) tests.push(cc)
+					} else if (tests.indexOf(cb) == -1) tests.push(cb)
+				} else if (tests.indexOf(ca) == -1) tests.push(ca)
+			}
+			return tests
+		}
+
+		static function shouldErrorTemplate(code: String, a: [String], b: [String] = null, c: [String] = null, d: [String] = null): Void {
+			for (test in template(code, a, b, c, d)) shouldError(test)
+		}
+
+		static function shouldNotErrorTemplate(code: String, a: [String], b: [String] = null, c: [String] = null, d: [String] = null): Void {
+			for (test in template(code, a, b, c, d)) shouldNotError(test)
+		}
+
+		static var library = Fs.readFileSync(__dirname + '/library/js/js.hexa')
+
+		static function didError(input: String): String? {
+			let lexeLibrary = Lexer.tokenize(library, "library/js/js.hexa")
+			let lexeInput = Lexer.tokenize(Buffer.fromString(input), "TEST")
+
+			try {
+				(new Typer()).fillFiles([
+					Parser.parseNodes(lexeLibrary),
+					Parser.parseNodes(lexeInput)
+				])
+			} catch(e: Any) {
+				return '' + e
+			}
+			return null
+		}
+	}

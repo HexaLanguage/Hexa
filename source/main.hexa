@@ -1,0 +1,610 @@
+// The Hexa Compiler
+// Copyright (C) 2018-2020  Oleg Petrenko
+// Copyright (C) 2018  Bogdan Danylchenko
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, version 3 of the License.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module
+	// Compiler version
+	let version = "0.0.1"
+
+	// Contents of hexa.json
+	declare class Package {
+		let name: String
+		let version: String
+		let description: String
+		let author: String
+		let license: String
+		var addLicenseNoticeToOutput: Bool
+		let randomSeed: Int?
+		let define: Any
+		let noLib: Bool
+		var files: [String]
+		let targets: [{
+			name: String,
+			generator: String,
+			options: [String],
+			files: [String],
+			output: String
+		}]
+	}
+class Main{
+	/// Based on https://stackoverflow.com/questions/3430939/node-js-readsync-from-stdin
+	static function question(query: String): String {
+		Process.stdout.write(query)
+		var bufsize = 256
+		var buf = new Buffer(bufsize)
+		var bytesRead = 0
+		let stdin = (process.platform == "win32")? Process.stdin.fd : Fs.openSync('/dev/stdin', 'rs')
+		try {
+			bytesRead = Fs.readSync(stdin, buf, 0, bufsize)
+		} catch (e: Any) {{
+			let e: { code: String } = e
+			if (e.code == 'EAGAIN') return 'ERROR: interactive stdin input not supported.'
+			if (e.code == 'EOF') return ''
+			throw e // unexpected exception
+		}}
+		if (bytesRead == 0) {
+			// No more stdin input available.
+			// OS X 10.8.3: regardless of input method, this is how the end
+			// of input is signaled.
+			// Windows 7: this is how the end of input is signaled for
+			// *interactive* stdin input.
+			return ''
+		}
+		// Process the chunk read.
+		let answer = buf.toString('utf8', 0, bytesRead).trim()
+		return answer
+	}
+
+	// Asks a couple of questions and creates hexa.json
+	function init() {
+		if (Fs.existsSync("hexa.json")) {
+			let create = question("Hexa package 'hexa.json' already exists here. Create new? (no)")
+			if (create.toLowerCase() != 'yes', create.toLowerCase() != 'y')
+				Process.exit(1)
+		}
+
+		var currentDirTmp = process.cwd().split(Path.sep)
+		var packageFileName = currentDirTmp.splice(0, -1).join(Path.sep) + Path.sep + "hexa.json"
+		var currentDir = currentDirTmp[currentDirTmp.length - 1]
+		var name = question('Enter package name (\(currentDir)): ')
+		if (name == "") name = currentDir
+
+		var version = question("Enter package version (1.0.0): ")
+		if (version == "") version = "1.0.0"
+
+		var description = question("Enter package description: ")
+
+		var main = question("Enter main file (main.hexa): ")
+		if (main == "") main = "main.hexa"
+
+		let target = {
+			name: "default",
+			generator: "js",
+			output: name,
+			options: []
+		}
+		let generatorstr = question("Enter generator type (JavaScript):\n1. JavaScript\n2. C\n3. Haxe\n")
+		if (generatorstr.toUpperCase() == "C" || generatorstr == "2") target.generator = "native"
+		else if (generatorstr.toUpperCase() == "HAXE" || generatorstr == "3") target.generator = "haxe"
+		else {
+			target.output += '.js'
+			let option = question("Select standard library (no library):\n1. no library\n2. nodejs\n3. browser\n")
+			switch (option) {
+				case "2": target.options.push('nodejs')
+				case "3": target.options.push('browser')
+			}
+		}
+
+		while (!(main.endsWith(".hexa"))) {
+			Process.stdout.write("Wrong file name. Must end with '.hexa'.\n")
+			main = question("Enter main file (main.hexa): ")
+		}
+
+		let author = question("Enter package author name: ")
+		let license = question("Enter license: ")
+
+		let pack: Package = {
+			name: name, version: version, description: description,
+			author: author, license: license, targets: [ target ], files: [main]
+		}
+
+		let extras = []
+
+		var addGit = false
+		if (Fs.existsSync('.git'))
+			if (!Fs.existsSync('.gitignore') || !Fs.existsSync('.gitattributes'))
+				if (['y','yes',''].includes(question('Create additional git files? (.gitignore, .gitattributes)').toLowerCase().trim())) {
+					if (!Fs.existsSync('.gitignore')) extras.push('.gitignore')
+					if (!Fs.existsSync('.gitattributes')) extras.push('.gitattributes')
+					addGit = true
+				}
+
+		let addMain = Fs.existsSync(main) == false
+		if (addMain) extras.push(main)
+
+		// Convert to \r\n
+		let packageStr = JSON.stringify(pack, null, "\t").split('\r\n').join('\n').split('\n').join('\r\n')
+		let extrasStr = extras.length > 0? '\nAnd \'' + extras.join('\', \'') + '\'' : ''
+
+		let answ = question('About to write to: \(packageFileName):\n\(packageStr)\(extrasStr)\nIs this ok? (yes)')
+		if (answ != "", answ.toLowerCase() != 'yes', answ.toLowerCase() != 'y') {
+			console.log('Exiting without changes')
+			Process.exit(1)
+		}
+
+		// Handle yes
+		Fs.writeFileSync("hexa.json", packageStr + '\r\n')
+
+		if (addMain, !Fs.existsSync(main)) Fs.writeFileSync(main, 'console.log("Thank you for choosing Hexa")')
+
+		if (addGit, !Fs.existsSync('.gitattributes')) Fs.writeFileSync('.gitattributes', [
+			'# Auto detect text files and perform LF normalization',
+			'* text=auto',
+			''
+		].join('\r\n'))
+
+		if (addGit, !Fs.existsSync('.gitignore')) Fs.writeFileSync('.gitignore', [
+			'# Mac & Win',
+			'*~',
+			'._*',
+			'*DS_Store*',
+			'.DS_Store',
+			'.DS_Store?',
+			'.Spotlight-V100',
+			'.Trashes',
+			'ehthumbs.db',
+			'Thumbs.db',
+			'*Thumbs.db',
+			'__MACOSX',
+			'',
+			'# Custom',
+			'*.map',
+			target.output, // Re-generated on each compilation
+			'node_modules',
+			''
+		].join('\r\n'))
+
+		Process.stdout.write("Hexa package initialized!")
+	}
+
+	function symlink(): Void {
+		switch (process.platform) {
+			case 'linux':
+				// TODO probably just copy or do actual symlinking?
+				Fs.renameSync('./hexa', '/usr/bin/hexa')
+				console.log("Symlinked successfully!")
+			case _:
+				console.log("Cannot symlink on \(process.platform). You must add hexa to your PATH manually.")
+				Process.exit(1)
+		}
+	}
+
+	var lines = 0
+	var targetName = 'default'
+	var targetIndex = 0
+
+	// Parses a file
+	function processFile(target: String): Node {
+		let content = Fs.readFileSync(target)
+		let tokens = Lexer.tokenize(content, target)
+		if (tokens.length > 0)
+			lines += tokens.line[tokens.length - 1]
+		let parsed = Parser.parseNodes(tokens)
+		return parsed
+	}
+
+	function simplyCompileToJs(buffer: Buffer, path: String): String? {
+		let input: Package = {
+			files: []
+		} as! Package
+		// Load standard library
+		let js = processFile(__dirname + '/library/js/js.hexa')
+		let nodejs = processFile(__dirname + '/library/nodejs/nodejs.hexa')
+		let tokens = Lexer.tokenize(buffer, path)
+		let parser = Parser.parseNodes(tokens)
+		let collected = [js, nodejs, parser]
+		if (parser == null) return null
+		let files = collected
+		let typer = new Typer()
+		typer.fillFiles(files)
+		let normalizer = new Normalizer()
+		let generator = new GenJs()
+		normalizer.keywords = generator.reserved
+		normalizer.collected = files
+		normalizer.nativeEnums = generator.nativeEnums
+		normalizer.package = input
+		if (let randomSeed = input.randomSeed) normalizer.id = randomSeed
+		if (let globalAccessor = generator.globalAccessor) normalizer.globalAccessor = globalAccessor
+		normalizer.typer = typer
+		let normal = normalizer.normalize()
+		return generator.perform(normal)
+	}
+
+	// Read-eval-print loop, starts if hexa called without arguments
+	function repl() {
+		console.log('\x1b[35m' + 'Hexa \(version) on node.js ' + Process.versions.node + '\x1b[0m')
+		console.log('\x1b[33m' + 'To print something onto screen use `console.log(value)`' + '\x1b[0m')
+		console.log('\x1b[33m' + 'To clear REPL memory use `.clear`' + '\x1b[0m')
+		console.log('\x1b[33m' + 'To close REPL use `.exit`' + '\x1b[0m')
+		// REPL
+		var linesAll: [String] = []
+		var linesLatest: [String] = []
+		while (true) {
+			var line = question('\x1b[32m' + "> " + '\x1b[0m')
+			if (line == '.clear') {
+				linesAll = []
+				linesLatest = []
+				continue
+			}
+			if (line == '.exit') {
+				return
+			}
+			if (line.length == 0) continue
+			linesLatest.push(line)
+			try {
+				var code = '"use strict"\r\n'
+				try {
+					let content = linesAll.join('\n') + '\n' + linesLatest.join('\n')
+					let compiled = simplyCompileToJs(Buffer.fromString(content), "REPL")
+					if (compiled == null) continue
+					if (let compiled = compiled) code = compiled
+				} catch (e: Any) {
+					let error = '' + e
+					if (error.indexOf('<!--eof-->')  == -1) {
+						// Do not remember previous command
+						linesLatest = []
+						console.error('\x1b[31mCompilation Error: ' + e, '\x1b[0m')
+					} else {
+						Process.stdout.write('\x1b[32m' + '>' + '\x1b[0m')
+					}
+					continue
+				}
+
+				// Success
+				for (line in linesLatest) linesAll.push(line)
+				linesLatest = []
+
+				let result = eval(code)
+			} catch (e: Any) {
+				console.error("Error: " + e)
+			}
+		}
+	}
+
+	// Parses all files, shows errors and stops if any
+	function processFiles(targets: [String]): [[Node]] {
+		var res: [[Node]] = []
+		for (target in targets) {
+			if (!Fs.existsSync(target)) {
+				console.log('No such source file on disk `\(target)`')
+				continue
+			}
+
+			try {
+				res.push(processFile(target))
+			} catch (e: Any) {
+				console.log(e.toString())
+			}
+		}
+		if (targets.length != res.length) {
+			console.log('[Stopped on errors]')
+			Process.exit(1)
+		}
+		return res
+	}
+
+	function incorrect(what: String) {
+		Process.stdout.write("Incorrect package file! Field `\(what)` does not exists\n")
+		Process.exit(1)
+	}
+
+	// Loads hexa.json
+	function loadPackage(filename: String, target: String): Package {
+		let pack: Package = JSON.parse(Fs.readFileSync(Path.resolve(filename)).toString('utf8').split('\r\n').join('\n'))
+		if (pack.name == null) incorrect('name')
+		if (pack.targets == null) incorrect('targets')
+		if (let define = pack.define) for (key in Reflect.ownKeys(define)) {
+			if (!Reflect.has(Project.defines, key)) // `--define` has higher priority
+				Reflect.set(Project.defines, key, Reflect.get(define, key))
+		}
+
+		let t = (function () {
+			for (t in pack.targets.length) {
+				if (pack.targets[t].name == target) {
+					targetIndex = t
+					return pack.targets[t]
+				}
+			}
+			Process.stdout.write("Cannot find `\(target)` target in package file\n")
+			Process.exit(1)
+		})()
+
+		let generator = availableGenerators(t.generator)
+		if (generator == null) {
+			Process.stdout.write("Generator `\(t.generator)` not available or not supported by this compiler version\n")
+			Process.exit(1)
+		}
+
+		// Add standard library
+		if (pack.files == null) pack.files = []
+		if (pack.noLib == true) {
+			// Nothing
+		} else {
+			setLibrary(generator, t.options, pack.files, Project.defines)
+			// Add files from specific build target
+			if (let extra = pack.targets[targetIndex].files) {
+				// Push to the end of list, cause extras generally contain target-specific entry points
+				for (file in extra) pack.files.push(file)
+			}
+		}
+
+		// Defaults
+		if (pack.addLicenseNoticeToOutput == null) pack.addLicenseNoticeToOutput = true
+
+		return pack
+	}
+
+	/// Entry
+	new() {
+		// Debug information
+
+		/// Used to measure compiler performance and to show a success message
+		let begin = Date.now()
+
+		// Initialize compiler
+		Lexer.init()
+
+		// Cleanup argv
+		if (Process.argv[0].endsWith('node.exe') || Process.argv[0].endsWith('node')) {
+			Process.argv.shift()
+			Process.argv.shift()
+		} else if (Process.argv[0].endsWith(/*hexa*/'.exe')) Process.argv.shift()
+
+		// Gather defines `--define name=value`
+		let defines: Any = {}
+		while (Process.argv[0] == "--define") {
+			if (Process.argv.length < 2) {
+				console.log("Usage: `--define name=value`")
+				Process.exit(1)
+			}
+			Process.argv.shift()
+			let kv = Process.argv.shift().split('=')
+			if (kv.length < 2) {
+				console.log("Usage: `--define name=value`")
+				Process.exit(1)
+			}
+			let k = kv[0]
+			let v = JSON.parse(kv[1])
+			defines[k] = v
+		}
+		Project.defines = defines
+
+		// Exit before self-test
+		if (Process.argv[0] == "--syntax-linter") {
+			if (Process.argv.length < 2) {
+				console.log("Usage: `hexa --syntax-linter file.hexa`")
+			} else {
+				let file = Process.argv[1]
+				try {
+					let content = Fs.readFileSync(file)
+					try {
+						let tokens = Lexer.tokenize(content, file)
+						try {
+							let parser = Parser.parseNodes(tokens)
+						} catch (e: Any) console.log("\(e)")
+					} catch (e: Any) console.log("\(e)")
+				} catch (e: Any) console.log("ERROR: Unable to open file \(file)")
+			}
+			Process.exit(0)
+		}
+
+		// Self-test
+		#if debug
+			#if times
+				let beginTests = Date.now()
+			#end
+			TestLexer.test()
+			TestParser.test()
+			TestTyper.test()
+			#if times
+				console.log("[Tests finished in \(Date.now() - beginTests) ms]")
+			#end
+		#end
+
+		function ignoreArguments(fromIndex: Int)	{
+			if (fromIndex == Process.argv.length) { return }
+			let args = []
+			let count: Int = Process.argv.length - fromIndex
+			var i = 0
+			while (i < count)
+				args.push(Process.argv[i++ + fromIndex])
+			console.log('Arguments `' + args.join("`, `") + '` ignored')
+		}
+
+		if (Process.argv[0] == "--version") {
+			console.log('Hexa \(version) on node.js ' + Process.versions.node)
+			ignoreArguments(1)
+			Process.exit(0)
+		}
+		// Usage examples
+		else if (Process.argv[0] == "--help") {
+			console.log("Usage: `hexa project.json` or `hexa init`")
+			ignoreArguments(3)
+			Process.exit(0)
+		}
+		else if (Process.argv[0] == null) {
+			repl()
+			Process.exit(0)
+		}
+		else if (Process.argv[0] == "init") {
+			init()
+			ignoreArguments(3)
+			Process.exit(0)
+		}
+		else if (Process.argv[0] == "symlink") {
+			symlink()
+			Process.exit(0)
+		}
+
+		// Get inputs
+		var currentFile = Path.resolve(Process.argv[0])
+		var currentParsedFile: ParsedPath = Path.parse(currentFile)
+		var input: Package = null as! Package
+		var packageFolder: String = currentParsedFile.dir
+
+		// Build the selected project
+		if (currentParsedFile.ext == ".json") {
+			process.argv.shift()
+			if (process.argv[0] == '--target') {
+				process.argv.shift()
+				targetName = process.argv[0] ?? 'default'
+				process.argv.shift()
+			}
+			input = loadPackage(currentFile, targetName)
+			ignoreArguments(0)
+			if (targetName != 'default')
+				console.log("[Building \(input.name) - \(targetName)]")
+			else
+				console.log("[Building \(input.name)]")
+		}
+		// Search for project in the selected folder
+		else if (Fs.existsSync(currentFile), Fs.lstatSync(currentFile).isDirectory()) {
+			ignoreArguments(3)
+			input = loadPackage(currentFile + Path.sep + "hexa.json", targetName)
+			packageFolder = currentFile
+		}
+		// Evaluate file directly
+		else if (currentParsedFile.ext == ".hexa") {
+			//let code = '"use strict"\r\n' + GenJs.stringifyProject(Normalizer.normalize(Node.TBlock([processFile(currentFile)]), GenJs.reserved))
+			try {
+				eval(simplyCompileToJs(Fs.readFileSync(currentFile), currentFile))
+			} catch (e: Any) {
+				console.error("" + e)
+			}
+			Process.exit(0)
+			return
+		}
+		else {
+			console.error('Unknown command: \(Process.argv[0])')
+			console.error('Try --help')
+			Process.exit(1)
+			return
+		}
+
+		// Perform compilation
+		#if times
+			let beginParsing = Date.now()
+		#end
+
+		var files: [[Node]] = []
+		if (input.files != null) {
+			let fileList = input.files.map(function(file) {
+				// Avoid global paths
+				if (file.startsWith('/') || file.charAt(1) == ':') return Path.resolve(file)
+				return Path.resolve(packageFolder + Path.sep + file)
+			})
+			files = processFiles(fileList)
+		}
+
+		#if times
+			console.log("[Parsing finished in \(Date.now() - beginParsing) ms]")
+			let beginTyper = Date.now()
+		#end
+
+		let typer = new Typer()
+		try {
+			typer.fillFiles(files)
+		} catch (e: Any) {
+			console.log(e.toString())
+			Process.exit(1)
+		}
+
+		#if times
+			console.log("[Typer finished in \(Date.now() - beginTyper) ms]")
+		#end
+
+		let normalizer = new Normalizer()
+
+		let generators = [:]
+
+		function registerTarget(name: String, generator) {
+			if (let generator = generators.get(name))
+				console.log('Note: generator `\(name)` was overridden')
+			generators.set(name, generator)
+		}
+
+		registerTarget('js', GenJs.spawn)
+		registerTarget('haxe', GenHaxe.spawn)
+		registerTarget('native', GenCxx.spawn)
+
+		// Perform code generation
+		if (let generatorName = input.targets[targetIndex].generator) {
+			if (let generatorSpawner = generators.get(generatorName)) {
+				let generator = generatorSpawner()
+				let target = packageFolder + Path.sep + Path.parse(input.targets[targetIndex].output).name + generator.extension
+				let target = Path.join(packageFolder, input.targets[targetIndex].output)
+				normalizer.keywords = generator.reserved
+				normalizer.collected = files
+				normalizer.nativeEnums = generator.nativeEnums
+				normalizer.reservedGlobals = generator.reservedGlobals ?? normalizer.reservedGlobals
+				normalizer.package = input
+				if (let randomSeed = input.randomSeed) normalizer.id = randomSeed
+				if (let globalAccessor = generator.globalAccessor) normalizer.globalAccessor = globalAccessor
+				normalizer.typer = typer
+
+				#if times
+					let beginNormalizer = Date.now()
+				#end
+
+				let normal = normalizer.normalize()
+
+				#if times
+					console.log("[Normalizer finished in \(Date.now() - beginNormalizer) ms]")
+					let beginGenerator = Date.now()
+				#end
+
+				// Print hints out
+				for (hint in Project.hints) {
+					console.log(hint.toString())
+				}
+
+				let outs = generator.perform(normal)
+
+				#if times
+					console.log("[Generator finished in \(Date.now() - beginGenerator) ms]")
+				#end
+
+				Fs.writeFileSync(target, outs)
+			} else {
+				console.log("Generator for `\(generatorName)` is not registered.")
+				Process.exit(1)
+			}
+		} else {
+			console.log("Generator is not defined or unknown. Is there `target.generator` field in `hexa.json`?")
+			Process.exit(1)
+		}
+
+		let delta = Date.now() - begin
+		let lps = Math.round(lines / (delta/1000))
+		console.log("[Finished in \(delta) ms, \(lines) lines, \(lps) lines per second]")
+		Process.stdout.once('drain', function () { Process.exit(0) })
+		Process.stdout.write('')
+	}
+}
+
+// Entry point
+{
+	new Main()
+}

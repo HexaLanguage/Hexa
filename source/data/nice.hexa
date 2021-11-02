@@ -1,0 +1,160 @@
+// The Hexa Compiler
+// Copyright (C) 2018-2020  Oleg Petrenko
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, version 3 of the License.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module
+	// Does not return a value
+	// See: `/docs/normalizer.md`
+	enum NiceStatement {
+		Statements(el: [NiceStatement]) // Multiple statements *not* wrapped into a block
+		Block(el: [NiceStatement])
+		Call(e: NiceExpression, args: [NiceExpression], expects: [Type], kind: CallKind)
+		New(e: NiceExpression, args: [NiceExpression])
+		UnusedExpression(e: NiceExpression)
+		Var(name: String, expr: NiceExpression, type: Type)
+		Const(name: String, expr: NiceExpression, type: Type)
+		Function(name: String, expr: NiceStatement, args: [String], defaults: [NiceExpression], funcType: Type)
+		Return(e: NiceExpression) // TODO Null?
+		If(econd: NiceExpression, eif: NiceStatement, eelse: NiceStatement) // TODO Null?
+		Try(expr: NiceExpression, t: [Type], v: [String], catches: [NiceStatement], temp: String)
+		Throw(value: NiceExpression)
+		Assign(name: NiceExpression, value: NiceExpression, to: Type)
+		Assignop(name: NiceExpression, op: Token, value: NiceExpression)
+		Dot(expr: NiceExpression, name: String)
+		For(name: String, over: NiceExpression, by: NiceStatement)
+		While(econd: NiceExpression, e: NiceStatement, pre: Bool)
+		Increment(e: NiceExpression)
+		Decrement(e: NiceExpression)
+		Switch(expr: NiceExpression, cases: [[NiceExpression]], statements: [NiceStatement])
+		Continue
+		Break
+		SuperConstructor(args: [NiceExpression])
+	}
+
+	// Returns a value
+	// See: `/docs/normalizer.md`
+	enum NiceExpression {
+		String(s: String)
+		Int(s: String)
+		Float(s: String)
+		True
+		False
+		Ident(s: String, type: Type)
+		Null
+		This(me: Type)
+		Dot(expr: NiceExpression, name: String, result: Type)
+		Call(e: NiceExpression, args: [NiceExpression], result: Type, kind: CallKind)
+		New(e: NiceExpression, args: [NiceExpression])
+		Binop(a: NiceExpression, op: Token, b: NiceExpression, result: Type)
+		Function(name: String, expr: NiceStatement, args: [String], defaults: [NiceExpression], funcType: Type)
+		Arrow(expr: NiceExpression, args: [String], defaults: [NiceExpression], types: [NodeType], returns: NodeType)
+		Parenthesis(inner: NiceExpression)
+		Object(names: [String], el: [NiceExpression], types: [NodeType])
+		Array(values: [NiceExpression], valueType: NodeType)
+		Map(keys: [NiceExpression], values: [NiceExpression], keyType: NodeType, valueType: NodeType)
+		Unop(op: Token, postfix: Bool, e: NiceExpression)
+		Elvis(nullable: Node, othewise: Node)
+		If(econd: NiceExpression, eif: NiceExpression, eelse: NiceExpression) // TODO Null?
+		Index(expr: NiceExpression, index: NiceExpression)
+		UnsafeBitCast(expr: NiceExpression, to: Type)
+		Is(expr: NiceExpression, of: Type)
+
+		/// name op= value
+		Assignop(name: NiceExpression, op: Token, value: NiceExpression)
+		NativeOperator(kind: NativeOperatorKind, args: [NiceExpression], name: String)
+
+		/// `switch(expr.tag)` extracts tag for `case tag` patterns
+		EnumTag(expr: NiceExpression)
+
+		/// type.tagName(args)
+		Enum(type: String, tagName: String, tag: NiceExpression, args: [NiceExpression])
+
+		/// `case E.N(parameter1, parameter2):` does `parameterN` extraction
+		EnumParameter(expr: NiceExpression, index: Int)
+
+		/// `_` used in case patterns (when native enums enabled)
+		Underscore
+	}
+
+	enum NativeOperatorKind : Int {
+		Infix = 0
+		Function = 1
+		Prefix = 2
+		Postfix = 3
+	}
+
+	enum CallKind : Int {
+		Static = 10
+		Function = 11
+		VirtualMethod = 12
+		// TODO KnownVirtualMethod = 13
+	}
+
+	class NiceProject {
+		let interfaces: [NiceClass] = []
+		let classes: [NiceClass] = []
+		let enumsSimple: [NiceSimpleEnum] = []
+		let enumsComplex: [NiceComplexEnum] = []
+		let globalVars: [NiceStatement] = []
+		let globalFuncs: [NiceStatement] = []
+		let init: [NiceStatement] = []
+		var package: Package
+		var typer: Typer
+
+		new () {}
+	}
+
+	class NiceClass {
+		new () {}
+		var external: Bool
+		var useless: Bool
+		var name: String
+		var extend: String?
+		var genericParams: [String]
+		var implement: String
+		var implementParams: [String]
+		var rename: Int
+		var constructor
+
+		var staticMethods: [NiceStatement] = []
+		var staticVars: [NiceStatement] = []
+		var methods: [NiceStatement] = []
+		var vars: [NiceStatement] = []
+		let property: [String] = [] // `var/let { get ?set }`
+
+		var jsRequire: String? = null
+		var jsNative: String? = null
+	}
+
+	class NiceSimpleEnum {
+		new () {}
+		var name: String
+		var external: Bool
+		var names: [String]
+		var values: [NiceExpression]
+		var staticMethods: [NiceStatement] = []
+		var staticVars: [NiceStatement] = []
+	}
+
+	class NiceComplexEnum  {
+		new () {}
+		var name: String
+		var external: Bool
+		var names: [String]
+		var constructors: [[String]]
+		var constructorsTypes: [[Type]]
+		var types: [[NodeType]]
+		var staticMethods: [NiceStatement] = []
+		var staticVars: [NiceStatement] = []
+	}

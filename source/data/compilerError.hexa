@@ -1,0 +1,47 @@
+// The Hexa Compiler
+// Copyright (C) 2018  Oleg Petrenko
+// Copyright (C) 2018  Bogdan Danylchenko
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, version 3 of the License.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module
+	// Those errors are thrown at any stage of compilation
+	class CompilerError {
+		var exception: Fail
+		var details: String
+		var line: Int
+		var column: Int
+		var fileName: String
+
+		new (except: Fail, details: String? = null, line: Int? = null, column: Int? = null, filename: String? = null) {
+			this.exception = except
+			this.details = (details == null) ? "" : details
+			this.line = (line == null) ? 0 : line
+			this.column = (column == null) ? 0 : column
+			this.fileName = (filename == null) ? "" : filename
+		}
+
+		function toString() {
+			return "[" + fileName + ":" + line + ":" + column + "]: " + details
+		}
+	}
+
+	// Stages and kinds of errors
+	// TODO use error codes! coz localization (what is #33 blahblah? oh its #33 unused x!)!
+	enum Fail {
+		ParserError
+		ParserInternalError
+		LexerError
+		TyperError
+		InfererError
+	}

@@ -1,0 +1,337 @@
+// The Hexa Compiler
+// Copyright (C) 2020  Oleg Petrenko
+// Copyright (C) 2018  Bogdan Danylchenko
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, version 3 of the License.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module
+	// @name(values[0], ...values[n])
+	class Attribute {
+		var name: String
+		var values: [Node]
+		new (name: String, values: [Node]) {
+			this.name = name
+			this.values = values
+		}
+	}
+
+	declare Handle<T> = {value: T}
+
+	// Global data container
+	class Project {
+		static let mapAttributes: [Node : [Attribute]] = [:]
+		static let mapNames: [Node : Node] = [:]
+		static let data: [Node : NodeData] = [:]
+		static let hints: [Hint] = []
+		static var defines: Any = {}
+	}
+
+	// Node position info
+	class NodeData {
+		new(atLine, atColumn, atFile) {
+			line = atLine
+			column = atColumn
+			fileName = atFile
+		}
+		var line: Int
+		var column: Int
+		var fileName: String
+	}
+
+	// TODO remove `T` prefix
+	// TODO move to nodes.hexa
+	// Syntax tree
+	// See: `/docs/parser.md`
+	enum Node {
+		// Constants
+		TString(s: String)
+		// ident
+		TIdent(name: String)
+		// true/false
+		TBool(b: Bool)
+		// this
+		TThis
+		// super
+		TSuper
+		// 123
+		TInt(s: String)
+		// 0.123
+		TFloat(s: String)
+		// null
+		TNull
+
+		///////////////////
+		/// Syntax Tree ///
+		///////////////////
+
+		// declare T = V
+		TTypeAlias(alias: NodeType, value: NodeType)
+
+		// a op b
+		TBinop(a: Node, op: Token, b: Node)
+
+		// a op= b
+		TAssignop(a: Node, op: Token, b: Node)
+
+		// { el[0] ... el[n] }
+		TBlock(el: [Node])
+
+		// e(args[0], ...args[n])
+		TCall(e: Node, args: [Node], argNames: [String])
+
+		// if (econd[0], ...econd[n]) { eif } [else { eelse }]
+		TIf(econd: [Node], eif: Node, eelse: Node?)
+
+		TParenthesis(inner: Node) // (inner)
+		TReturn(e: Node?) // return e
+		TThrow(e: Node) // throw e
+		TBreak // break
+		TContinue // continue
+
+		// postfix ? e op : op e
+		TUnop(op: Token, postfix: Bool, e: Node)
+
+		// while (econd) { e } or if pre == true then do { e } while (econd)
+		TWhile(econd: Node, e: Node, pre: Bool)
+
+		// [declare] function name(vars): rettype { expr }
+		TFunction(name: String, expr: Node, vars: [Node], retType: NodeType, external: Bool)
+
+		// (vars): rettype => { expr }
+		TArrow(expr: Node, vars: [Node], retType: NodeType)
+
+		// [declare] (const ? let : var) name: t = expr
+		TVar(name: String, t: NodeType, expr: Node, const: Bool, external: Bool)
+
+		// var TVar[0], ..., TVar[n]
+		TVars(vars: [Node])
+
+		// external class t extends extend implements implement { fields }
+		TClass(t: NodeType, extend: NodeType?, implement: [NodeType], fields: [Node], external: Bool, kind: ClassKind)
+
+		// var name: T { get { return x } set (v) {} }
+		// TVar, TFunction, TFunction
+		Property(v: Node, g: Node, s: Node)
+
+		// try { expr } catch(v[0]:t[0]) { catches[0] } ... catch(v[n]:t[n]) { catches[n] }
+		TTry(expr: Node, t: [NodeType], v: [Node], catches: [Node])
+
+		// expr.name
+		TDot(expr: Node, name: String)
+
+		// expr.Name
+		TDotUpper(expr: Node, name: String)
+
+		// new t { } (args)
+		TNew(path: [String], t: NodeType, args: [Node], fields: [String], el: [Node], argNames: [String])
+
+		// [elements[0], ...elements[n]]
+		TArray(elements: [Node])
+
+		// [keys[0] : values[0], ... keys[n] : values[n]]
+		TMap(keys: [Node], values: [Node])
+
+		// expr[index]
+		TIndex(expr: Node, index: Node)
+
+		// switch (exprs[0], exprs[n]) {
+		//     case cases[0]: conds[0]
+		//     case cases[n]: conds[n]
+		// }
+		TSwitch(exprs: [Node], conds: [Node], guards: [Node], cases: [Node])
+
+		// module path[0].path[1].r..path[n] { el }
+		TModule(path: [String], el: [Node])
+
+		// { name[0]: el[0], name[1]: el[1], ... name[n]: el[n] }
+		// NOTE: Do not use Map here
+		TObject(names: [String], el: [Node])
+
+		// enum t : valuesType extends extend { fields[0] ... fields[n] }
+		TEnum(t: NodeType, fields: [Node], valuesType: NodeType, extend: NodeType?)
+
+		// let expr(extract[0], ..., extract[n]) = name
+		TEnumExtract(path: [String], bind: [Node/*.TVar*/], expr: Node)
+
+		// using path[0], ..., path[n]
+		TUsing(path: [String])
+
+		// expr is t
+		TIs(expr: Node, t: NodeType)
+
+		// expr as t
+		// expr as? t
+		TAs(expr: Node, kind: Token, t: NodeType)
+
+		TUnderscore // _
+		TStatic(field: Node) // `static` field
+		TPrivate(field: Node) // `private` field or type
+		TExport(field: Node) // `export` type
+
+		// for (name in over) by
+		// for (name in over ... range) by
+		TFor(name: String, over: Node, by: Node, range: Node)
+
+		// nullable ?? othewise
+		Elvis(nullable: Node, othewise: Node)
+
+		// (T<A, B>)
+		NodeTypeValue(type: NodeType)
+
+		static function stringify(node: Node): String {
+			switch (node) {
+				case Node.TString(s): return "'\(s)'"
+				case Node.TIdent(name): return name
+				case Node.TBool(b): return b? "true" : "false"
+				case Node.TInt(s): return s
+				case Node.TFloat(s): return s
+				case Node.TNull: return "null"
+				case Node.TThis: return "this"
+				case Node.TIndex(expr, index): return Node.stringify(expr) + '[' + Node.stringify(index) + ']'
+				case Node.TDot(expr, name): return Node.stringify(expr) + '.' + name
+				case Node.TDotUpper(expr, name): return Node.stringify(expr) + '.' + name
+				case Node.TCall(e, args, argNames):
+					let arg = []
+					for (i in args.length)
+						if (let name = argNames[i])
+							arg.push(name + ': ' + Node.stringify(args[i]))
+						else
+							arg.push(Node.stringify(args[i]))
+					return Node.stringify(e) + '(' + arg.join(', ') + ')'
+				case Node.TArray(elements): return '[' + [for (el in elements) Node.stringify(el)].join(', ') + ']'
+				case Node.TBinop(a, op, b): return Node.stringify(a) + ' ' + Token.stringify(op) + ' ' + Node.stringify(b)
+				case Node.TObject(names, el):
+					return '{' + [for (i in el.length) names[i] + ': ' + Node.stringify(el[i])].join(', ') + '}'
+				case Node.NodeTypeValue(t):
+					return DataHelper.extractTypeName(t)
+				case Node.TStatic(f): return 'static ' + Node.stringify(f)
+				case _: return "..."
+			}
+		}
+	}
+
+	// Node extentions
+	class DataHelper {
+		// returns var NAME
+		static function varName(v: Node) {
+			switch (v) {
+				case Node.TVar(name,_): return name
+				case _: throw 'varName got not a TVar, but `\(v)`'
+			}
+		}
+
+		// returns var NAME, enum NAME {}, function NAME(), etc
+		static function nameOf(v: Node): String {
+			switch (v) {
+				case Node.TPrivate(node): return nameOf(node)
+				case Node.Property(node): return nameOf(node)
+				case Node.TVar(name,_): return name
+				case Node.TEnum(t, _):
+					switch (t) {
+						case NodeType.Type(name): return name
+						case NodeType.ParametricType(name, _): return name
+					}
+					throw "unreachable"
+
+				case Node.TFunction(name,_): return name
+				case Node.TClass(t, _):
+					switch (t) {
+						case NodeType.Type(name): return name
+						case NodeType.ParametricType(name, _): return name
+					}
+					throw "unreachable"
+
+				case Node.TTypeAlias(t, _): switch (t) {
+					case NodeType.Type(name): return name
+					case NodeType.ParametricType(name): return name
+				}
+				case Node.TStatic(field): return nameOf(field)
+				case _: throw 'nameOf expected named node, but got `\(v)`'
+			}
+		}
+
+		// @attribute("hello", "world")
+		static function asStringAttValue(a: Attribute, index: Int): String {
+			switch (a.values[index]) {
+				case null: throw 'Got null, not a string'
+				case Node.TString(s): return s
+				case _: throw 'Got `\(a.values[index])`, not a string'
+			}
+		}
+
+		// { a b c } => c
+		static function getLastOfBlock(block: Node): Node? {
+			switch (block) {
+				case null: throw 'Got null, not a block'
+				case Node.TBlock(el): return el[el.length - 1]
+				case _: throw 'Got `\(block)`, not a block'
+			}
+		}
+
+		// Node that doesn't return a value, like "x = var a" or "x = return 123"
+		static function isVoidValue(block: Node): Bool {
+			switch (block) {
+				case null: return true
+				case Node.TReturn(_): return true
+				case Node.TBreak: return true
+				case Node.TContinue: return true
+				case Node.TVar(_): return true
+				case Node.TIf(_,_,eelse): if (eelse == null) return true
+				case Node.TEnum(_): return true
+				case Node.TClass(_): return true
+				case Node.TSwitch(_): return true
+				// Also recursively traverses { ... { ... { ... void }}}
+				case Node.TBlock(el):
+				if (el.length == 0) return true
+				return isVoidValue(el[el.length - 1])
+				case _: return false
+			}
+			return false
+		}
+
+		// Returns the only name of type
+		static function extractTypeName(t: NodeType): String? {
+			switch (t) {
+			case NodeType.Type(name): return name
+			case NodeType.ParametricType(name, _): return name
+			case null: return null
+			case _: throw 'Type has no name: ' + t
+			}
+		}
+
+		static function getAttribute(atts: [Attribute], name: String): Attribute? {
+			if (atts != null && atts.length > 0) for (att in atts) {
+				if (att.name == name) return att
+			}
+			return null
+		}
+	}
+
+	// var a: NodeType
+	enum NodeType {
+		Optional(type: NodeType) // T?
+		Type(name: String)
+		ParametricType(name: String, params: [NodeType])
+		Function(args: [NodeType], ret: NodeType)
+		FunctionArg(name: String, type: NodeType, defaultValue: Node)
+		Object(names: [String], types: [NodeType])
+
+		static function stringify(nodeType: NodeType): String {
+			return DataHelper.extractTypeName(nodeType)
+		}
+	}
+
+	enum ClassKind : Int {
+		Class
+		Interface
+	}

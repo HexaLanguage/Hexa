@@ -1,0 +1,22 @@
+# Mac & Win
+*~
+._*
+*DS_Store*
+.DS_Store
+.DS_Store?
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*Thumbs.db
+__MACOSX
+
+# Custom
+*.map
+# *.js
+node_modules/
+.debris
+Rubbish
+
+# Hexa
+hexa-node.js
